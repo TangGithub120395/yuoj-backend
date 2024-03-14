@@ -1,164 +1,91 @@
-# SpringBoot 项目初始模板
+## 项目介绍
 
-> 作者：[程序员鱼皮](https://github.com/liyupi)
-> 仅分享于 [编程导航知识星球](https://yupi.icu)
+主要分为三大部分
 
-基于 Java SpringBoot 的项目初始模板，整合了常用框架和主流业务的示例代码。
+1. 前端（Vue+TS）
+2. 后端（SpringBoot + MyBatis + Spring）
+3. 代码沙箱API（Docker + Docker java）
 
-只需 1 分钟即可完成内容网站的后端！！！大家还可以在此基础上快速开发自己的项目。
+## 上线
 
-[toc]
+本项目在上线的时候，采用了微服务的结构，将单体代码结构，改造成了微服务框架
 
-## 模板特点
+使用到的技术：
 
-### 主流框架 & 特性
+1. nacos
+2. redis
+3. rabbitmq
+4. Gateway
 
-- Spring Boot 2.7.x（贼新）
-- Spring MVC
-- MyBatis + MyBatis Plus 数据访问（开启分页）
-- Spring Boot 调试工具和项目处理器
-- Spring AOP 切面编程
-- Spring Scheduler 定时任务
-- Spring 事务注解
+流程：
 
-### 数据存储
+1. 先将微服务项目通过`Docker Compose`进行部署
+2. 通过访问`gateway服务`的接口文档，进行测试
+3. 在本机中运行前端项目，将`axios`的请求地址，改为服务器的地址
+4. 进行测试前端代码是否能够和后端代码互相通信
+5. 将代码沙箱服务部署，通过本机的测试类，直接调用代码沙箱API
 
-- MySQL 数据库
-- Redis 内存数据库
-- Elasticsearch 搜索引擎
-- 腾讯云 COS 对象存储
+遇到的问题：
 
-### 工具类
+1. `mysql容器`部署之后，一直掉
+   查看日志文件，发现是大小写设置的问题
+   需要在`docker配置文件`当中这样配置`mysql`
 
-- Easy Excel 表格处理
-- Hutool 工具库
-- Apache Commons Lang3 工具类
-- Lombok 注解
+   ```yaml
+   services: 
+   	mysql:
+       image: mysql # 使用的镜像
+       container_name: yuoj-mysql # 启动的实例名称
+       environment:
+         MYSQL_ROOT_PASSWORD: tz020515.. # root 用户密码
+         TZ: Asia/Shanghai
+       ports:
+         - "3306:3306" # 端口映射
+       volumes:
+         - ./.mysql-data:/var/lib/mysql # 将数据目录挂载到本地目录以进行持久化
+         - ./mysql-init:/docker-entrypoint-initdb.d # 启动脚本
+         - /home/mysql/conf/my.cnf:/etc/mysql/my.cnf
+         - /home/mysql/data2:/var/lib/mysql
+       command:
+         --lower-case-table-names=1
+       restart: always # 崩溃后自动重启
+       networks:
+         - mynetwork # 指定网络
+   ```
 
-### 业务特性
+2. 使用的是内存为`4G`的服务器，运行后端微服务的时候，老是掉
+   解决：设置运行`jar包`的堆栈参数（在各个服务中的`DockerFile`当中设置）
+   通过参数`-Xmx512m` `-Xms512m` 
 
-- Spring Session Redis 分布式登录
-- 全局请求响应拦截器（记录日志）
-- 全局异常处理器
-- 自定义错误码
-- 封装通用响应类
-- Swagger + Knife4j 接口文档
-- 自定义权限注解 + 全局校验
-- 全局跨域处理
-- 长整数丢失精度解决
-- 多环境配置
+   ```dockerfile
+   # 基础镜像
+   FROM openjdk:8-jdk-alpine
+   
+   # 指定工作目录
+   WORKDIR /app
+   
+   # 将 jar 包添加到工作目录，比如 target/yuoj-backend-user-service-0.0.1-SNAPSHOT.jar
+   ADD target/yuoj-backend-judge-service-0.0.1-SNAPSHOT.jar .
+   
+   # 暴露端口
+   EXPOSE 8104
+   
+   # 启动命令
+   ENTRYPOINT ["java","-Xmx512m","-Xms512m","-jar","/app/yuoj-backend-judge-service-0.0.1-SNAPSHOT.jar","--spring.profiles.active=prod"]
+   ```
 
+3. 微服务访问代码沙箱API，在执行Docker相关命令时，报错：`permission denied` 
+   解决：公开docker
 
-## 业务功能
+   ```sh
+   sudo chmod 666 /var/run/docker.sock
+   ```
 
-- 提供示例 SQL（用户、帖子、帖子点赞、帖子收藏表）
-- 用户登录、注册、注销、更新、检索、权限管理
-- 帖子创建、删除、编辑、更新、数据库检索、ES 灵活检索
-- 帖子点赞、取消点赞
-- 帖子收藏、取消收藏、检索已收藏帖子
-- 帖子全量同步 ES、增量同步 ES 定时任务
-- 支持微信开放平台登录
-- 支持微信公众号订阅、收发消息、设置菜单
-- 支持分业务的文件上传
+4. 开始的时候，打算将前端项目和后端微服务，分别部署在两个不同的服务器的，发现登录无法实现了
+   原因：使用的`Session`存储用户的登录信息，然后将这个`Session`保存到`Cookie`当中，`Cookie`是被保存到浏览器缓存当中的，两个服务器都不同，就会导致取不到同一个`Cookie`
+   
 
-### 单元测试
-
-- JUnit5 单元测试
-- 示例单元测试类
-
-### 架构设计
-
-- 合理分层
-
-
-## 快速上手
-
-> 所有需要修改的地方鱼皮都标记了 `todo`，便于大家找到修改的位置~
-
-### MySQL 数据库
-
-1）修改 `application.yml` 的数据库配置为你自己的：
-
-```yml
-spring:
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/my_db
-    username: root
-    password: 123456
-```
-
-2）执行 `sql/create_table.sql` 中的数据库语句，自动创建库表
-
-3）启动项目，访问 `http://localhost:8101/api/doc.html` 即可打开接口文档，不需要写前端就能在线调试接口了~
-
-![](doc/swagger.png)
-
-### Redis 分布式登录
-
-1）修改 `application.yml` 的 Redis 配置为你自己的：
-
-```yml
-spring:
-  redis:
-    database: 1
-    host: localhost
-    port: 6379
-    timeout: 5000
-    password: 123456
-```
-
-2）修改 `application.yml` 中的 session 存储方式：
-
-```yml
-spring:
-  session:
-    store-type: redis
-```
-
-3）移除 `MainApplication` 类开头 `@SpringBootApplication` 注解内的 exclude 参数：
-
-修改前：
-
-```java
-@SpringBootApplication(exclude = {RedisAutoConfiguration.class})
-```
-
-修改后：
+5. 微服务项目部署之后，访问接口文档报错：`knife4j异常` 
+   解决：重新启动`backend-gateway`服务即可
 
 
-```java
-@SpringBootApplication
-```
-
-### Elasticsearch 搜索引擎
-
-1）修改 `application.yml` 的 Elasticsearch 配置为你自己的：
-
-```yml
-spring:
-  elasticsearch:
-    uris: http://localhost:9200
-    username: root
-    password: 123456
-```
-
-2）复制 `sql/post_es_mapping.json` 文件中的内容，通过调用 Elasticsearch 的接口或者 Kibana Dev Tools 来创建索引（相当于数据库建表）
-
-```
-PUT post_v1
-{
- 参数见 sql/post_es_mapping.json 文件
-}
-```
-
-这步不会操作的话需要补充下 Elasticsearch 的知识，或者自行百度一下~
-
-3）开启同步任务，将数据库的帖子同步到 Elasticsearch
-
-找到 job 目录下的 `FullSyncPostToEs` 和 `IncSyncPostToEs` 文件，取消掉 `@Component` 注解的注释，再次执行程序即可触发同步：
-
-```java
-// todo 取消注释开启任务
-//@Component
-```
